@@ -42,27 +42,18 @@ bc221a1460375780636299a6ef146053575b600080fd5b603d607e565b604051
 c664736f6c634300060c0033
 `)
 
-	startTime := time.Now()
-	initBal := bigutils.NewU256(testutils.DefaultInitBalance)
-	valPubKey := ed25519.GenPrivKey().PubKey()
-	key, _ := testutils.GenKeyAndAddr()
-	var stateRoot []byte
-
 	println("total count:", runCount)
 	for i := 0; i < runCount; i++ {
+		startTime := time.Now()
+		initBal := bigutils.NewU256(testutils.DefaultInitBalance)
+		valPubKey := ed25519.GenPrivKey().PubKey()
+		key, _ := testutils.GenKeyAndAddr()
 		_app := testutils.CreateTestApp0(startTime, initBal, valPubKey, key)
 		//defer _app.Destroy()
 
 		println("run #", i)
 		tx, _, contractAddr := _app.DeployContractInBlock(key, creationBytecode)
 		_app.EnsureTxSuccess(tx.Hash())
-		if i == 0 {
-			stateRoot = _app.StateRoot
-		} else {
-			if !bytes.Equal(stateRoot, _app.StateRoot) {
-				println("stateRoot not equal!")
-			}
-		}
 
 		if !bytes.Equal(deployedBytecode, _app.GetCode(contractAddr)) {
 			panic("deployedBytecode not equal")
