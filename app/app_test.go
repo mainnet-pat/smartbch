@@ -200,17 +200,11 @@ func TestCheckTx_sep206SenderSet(t *testing.T) {
 	require.True(t, _app.IsInSenderSet(addr3))
 	require.False(t, _app.IsInSenderSet(addr4))
 
-	checkResp := _app.CheckTx(abci.RequestCheckTx{
-		Type: abci.CheckTxType_Recheck,
-		Tx:   testutils.MustEncodeTx(tx1),
-	})
-	require.Equal(t, app.AccountNonceMismatch, checkResp.Code)
+	checkResp := _app.RecheckTxABCI(tx1)
+	require.Equal(t, app.AccountNonceMismatch, checkResp)
 
-	checkResp = _app.CheckTx(abci.RequestCheckTx{
-		Type: abci.CheckTxType_Recheck,
-		Tx:   testutils.MustEncodeTx(tx4),
-	})
-	require.Equal(t, abci.CodeTypeOK, checkResp.Code)
+	checkResp = _app.RecheckTxABCI(tx4)
+	require.Equal(t, abci.CodeTypeOK, checkResp)
 }
 
 func TestIncorrectNonceErr(t *testing.T) {
@@ -295,6 +289,45 @@ func TestGasRefund_AdjustGasUsed(t *testing.T) {
 		require.Equal(t, bal1-100-test.gasUsed, _app.GetBalance(addr1).Uint64())
 		require.Equal(t, bal2+100, _app.GetBalance(addr2).Uint64())
 	}
+}
+
+func TestMinGas(t *testing.T) {
+	key1, _ := testutils.GenKeyAndAddr()
+	key2, addr2 := testutils.GenKeyAndAddr()
+	_app := testutils.CreateTestAppWithInitAmt(uint256.NewInt().SetUint64(1e18), key1, key2)
+	defer _app.Destroy()
+
+	ctx := _app.GetRunTxContext()
+	staking.SaveMinGasPrice(ctx, 10000, true)
+	staking.SaveMinGasPrice(ctx, 10000, false)
+	ctx.Close(true)
+	_app.ExecTxsInBlock()
+
+	tx, _ := _app.MakeAndSignTxWithGas(key1, &addr2, 100, nil, 100000, 1234)
+	require.Equal(t, app.InvalidMinGasPrice, _app.CheckNewTxABCI(tx))
+	_app.ExecTxInBlock(tx)
+	_app.EnsureTxFailed(tx.Hash(), "invalid gas price")
+
+	tx, _ = _app.MakeAndSignTxWithGas(key1, &addr2, 100, nil, 100000, 9999)
+	require.Equal(t, app.InvalidMinGasPrice, _app.CheckNewTxABCI(tx))
+
+	_app.ExecTxInBlock(tx)
+	_app.EnsureTxFailed(tx.Hash(), "invalid gas price")
+
+	tx, _ = _app.MakeAndSignTxWithGas(key1, &addr2, 100, nil, 100000, 10000)
+	require.Equal(t, uint32(0), _app.CheckNewTxABCI(tx))
+	_app.ExecTxInBlock(tx)
+	_app.EnsureTxSuccess(tx.Hash())
+
+	tx, _ = _app.MakeAndSignTxWithGas(key1, &addr2, 100, nil, 100000, 10001)
+	require.Equal(t, uint32(0), _app.CheckNewTxABCI(tx))
+	_app.ExecTxInBlock(tx)
+	_app.EnsureTxSuccess(tx.Hash())
+
+	tx, _ = _app.MakeAndSignTxWithGas(key1, &addr2, 100, nil, 100000, 12345)
+	require.Equal(t, uint32(0), _app.CheckNewTxABCI(tx))
+	_app.ExecTxInBlock(tx)
+	_app.EnsureTxSuccess(tx.Hash())
 }
 
 func TestJson(t *testing.T) {

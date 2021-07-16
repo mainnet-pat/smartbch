@@ -58,10 +58,14 @@ type TestApp struct {
 }
 
 func CreateTestApp(keys ...string) *TestApp {
-	return CreateTestApp0(time.Now(), bigutils.NewU256(DefaultInitBalance), ed25519.GenPrivKey().PubKey(), keys...)
+	return CreateTestApp0(time.Now(), ed25519.GenPrivKey().PubKey(), bigutils.NewU256(DefaultInitBalance), keys...)
 }
 
-func CreateTestApp0(startTime time.Time, testInitAmt *uint256.Int, valPubKey crypto.PubKey, keys ...string) *TestApp {
+func CreateTestAppWithInitAmt(initAmt *uint256.Int, keys ...string) *TestApp {
+	return CreateTestApp0(time.Now(), ed25519.GenPrivKey().PubKey(), initAmt, keys...)
+}
+
+func CreateTestApp0(startTime time.Time, valPubKey crypto.PubKey, initAmt *uint256.Int, keys ...string) *TestApp {
 	_ = os.RemoveAll(testAdsDir)
 	_ = os.RemoveAll(testMoDbDir)
 	params := param.DefaultConfig()
@@ -71,7 +75,7 @@ func CreateTestApp0(startTime time.Time, testInitAmt *uint256.Int, valPubKey cry
 	//_app.Init(nil)
 	//_app.txEngine = ebp.NewEbpTxExec(10, 100, 1, 100, _app.signer)
 	genesisData := app.GenesisData{
-		Alloc: KeysToGenesisAlloc(testInitAmt, keys),
+		Alloc: KeysToGenesisAlloc(initAmt, keys),
 	}
 
 	testValidator := &app.Validator{}
@@ -399,6 +403,13 @@ func (_app *TestApp) CheckNewTxABCI(tx *gethtypes.Transaction) uint32 {
 	res := _app.CheckTx(abci.RequestCheckTx{
 		Tx:   MustEncodeTx(tx),
 		Type: abci.CheckTxType_New,
+	})
+	return res.Code
+}
+func (_app *TestApp) RecheckTxABCI(tx *gethtypes.Transaction) uint32 {
+	res := _app.CheckTx(abci.RequestCheckTx{
+		Tx:   MustEncodeTx(tx),
+		Type: abci.CheckTxType_Recheck,
 	})
 	return res.Code
 }
