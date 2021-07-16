@@ -48,7 +48,7 @@ c664736f6c634300060c0033
 		initBal := bigutils.NewU256(testutils.DefaultInitBalance)
 		valPubKey := ed25519.GenPrivKey().PubKey()
 		key, _ := testutils.GenKeyAndAddr()
-		_app := testutils.CreateTestApp0(startTime, initBal, valPubKey, key)
+		_app := testutils.CreateTestApp0(startTime, valPubKey, initBal, key)
 		//defer _app.Destroy()
 
 		println("run #", i)
